@@ -63,6 +63,7 @@ process_this_frame = True
 def gen_frames():
     while True:
         success, img = cap.read()  # read the camera frame
+        cv2.flip(img, 1)
         if not success:
             break
         else:
@@ -109,7 +110,7 @@ def gen_frames():
                     cv2.putText(img, f"{round((dist_xy(rePos, rsPos) / ratio_px_mm) / 10, 1)}cm",
                                 (mid[0] + 10, mid[1] - 10),
                                 cv2.FONT_HERSHEY_DUPLEX, 0.4, (0, 255, 0), 1)
-                    
+
                     # ---- Find Mid-Upper Arm Diameter ----
                     # Calculate the padding to be given to the midpoint
                     x_padding = round(dist_xy(rsPos, mid) / 2)
@@ -154,10 +155,15 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/scan')
+def scan():
+    return render_template('scan.html')
+
+
 @app.route('/video_feed')
 def video_feed():
-    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(gen_frames(),  mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
