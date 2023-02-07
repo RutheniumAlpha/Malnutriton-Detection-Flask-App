@@ -1,4 +1,5 @@
 flask
 numpy
-opencv
+opencv-python
+opencv-contrib-python
 mediapipe
