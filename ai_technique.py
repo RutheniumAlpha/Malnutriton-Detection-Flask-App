@@ -3,6 +3,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import math
+
 app = Flask(__name__)
 
 
@@ -169,6 +170,7 @@ def gen_muac_frames():
                 # Convert frame to RGB since Mediapipe processes only RGB images
                 imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 # Process the RGB frame to get the landmarks
+                print(imgRGB)
                 results = pose.process(imgRGB)
                 if results.pose_landmarks:  # Continue only if result is proper
                     # Right Shoulder landmark
@@ -218,6 +220,8 @@ def gen_muac_frames():
 
 
 def get_data():
+    height_cm = None
+    muac_cm = None
     _, img = cap.read()  # read the camera frame
     cv2.flip(img, 1)
     newImg = img.copy()
@@ -277,7 +281,7 @@ def get_data():
 
 @app.route('/')
 def home():
-    return "Cam Detection"
+    return "Cam Detection (AI Method)"
 
 
 @app.route('/get')
