@@ -3,8 +3,10 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import math
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 
 def dist_xy(point1, point2):
@@ -22,6 +24,7 @@ def find_mid_arm_diameter(frame, mid_point, padding):
         return 0
     mid_arm = cv2.Canny(mid_arm, 100, 250)
     top_part = mid_arm[0:round(mid_arm.shape[1] // 2), 0:]
+
     bottom_part = mid_arm[round(mid_arm.shape[1] // 2):, 0:]
     tpp, bpp = top_part[0:, top_part.shape[0] //
                         2], bottom_part[0:, bottom_part.shape[0] // 2]
@@ -33,6 +36,7 @@ def find_mid_arm_diameter(frame, mid_point, padding):
         return 0
     top_height = padding - tpe[0][len(tpe[0]) - 1][1]
     bottom_height = padding - bpe[0][0][1]
+    print(top_height, bottom_height)
     return top_height + bottom_height
 
 
@@ -60,6 +64,7 @@ marker_size_mm = 149  # The size of the Aruco marker in mm
 
 
 def gen_calibration_frames():
+    recent = None
     while True:
         success, img = cap.read()  # read the camera frame
         cv2.flip(img, 1)
@@ -87,6 +92,13 @@ def gen_calibration_frames():
                         # Get the x, y, w, h from the bounding box
                         (x, y, w, h) = bbox
                         height_cm = (h / ratio_px_mm) / 10
+                        if recent is not None:
+                            if height_cm > (recent + 5) or height_cm < (recent - 5):
+                                recent = height_cm
+                            else:
+                                height_cm = recent
+                        else:
+                            recent = height_cm
                         #  Convert the height (px) to height (cm) using the ratio
                         cv2.putText(img, "Height", (x, y - 35),
                                     cv2.FONT_HERSHEY_PLAIN, 1, 255, 2)
@@ -104,6 +116,7 @@ def gen_calibration_frames():
 
 
 def gen_height_frames():
+    recent = None
     while True:
         success, img = cap.read()  # read the camera frame
         cv2.flip(img, 1)
@@ -133,6 +146,13 @@ def gen_height_frames():
                         # Get the x, y, w, h from the bounding box
                         (x, y, w, h) = bbox
                         height_cm = (h / ratio_px_mm) / 10
+                        if recent is not None:
+                            if height_cm > (recent + 5) or height_cm < (recent - 5):
+                                recent = height_cm
+                            else:
+                                height_cm = recent
+                        else:
+                            recent = height_cm
                         #  Convert the height (px) to height (cm) using the ratio
                         cv2.putText(img, "Height", (x, y - 35),
                                     cv2.FONT_HERSHEY_PLAIN, 1, 255, 2)
@@ -170,7 +190,6 @@ def gen_muac_frames():
                 # Convert frame to RGB since Mediapipe processes only RGB images
                 imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 # Process the RGB frame to get the landmarks
-                print(imgRGB)
                 results = pose.process(imgRGB)
                 if results.pose_landmarks:  # Continue only if result is proper
                     # Right Shoulder landmark
@@ -208,10 +227,10 @@ def gen_muac_frames():
                                5, (0, 255, 0), -1)
                     cv2.putText(img, f"Length: {round(dist_xy(rePos, rsPos)) // ratio_px_mm} cm",
                                 (mid[0] + 10, mid[1] - 30),
-                                cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
+                                cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1)
                     cv2.putText(img, f"Mid-Upper Arm Diameter: {mid_upper_arm_diameter//ratio_px_mm} cm",
                                 (mid[0] + 10, mid[1] - 10),
-                                cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
+                                cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1)
             _, buffer = cv2.imencode('.jpg', img)
             img = buffer.tobytes()
 
@@ -305,4 +324,4 @@ def muac():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(port=5000)

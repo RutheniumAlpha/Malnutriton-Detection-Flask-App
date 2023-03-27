@@ -3,8 +3,10 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import math
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 
 def dist_xy(point1, point2):
@@ -54,6 +56,7 @@ marker_size_mm = 149  # The size of the Aruco marker in mm
 
 
 def gen_calibration_frames():
+    recent = None
     while True:
         success, img = cap.read()  # read the camera frame
         cv2.flip(img, 1)
@@ -88,7 +91,14 @@ def gen_calibration_frames():
                 ratio_px_mm = marker_h_px / marker_size_mm
                 # Check for person in the frame
                 # Get the x, y, w, h from the bounding box
-                height_cm = (person_h_px / ratio_px_mm) / 10
+                height_cm = ((person_h_px / ratio_px_mm) / 10) - 3
+                if recent is not None:
+                    if height_cm > (recent + 5) or height_cm < (recent - 5):
+                        recent = height_cm
+                    else:
+                        height_cm = recent
+                else:
+                    recent = height_cm
                 #  Convert the height (px) to height (cm) using the ratio
                 cv2.putText(img, "Height", (int_corners[taIndex][0][2][0], int_corners[taIndex][0][2][1] - 35),
                             cv2.FONT_HERSHEY_PLAIN, 1, 255, 2)
@@ -138,7 +148,14 @@ def gen_height_frames():
                 ratio_px_mm = marker_h_px / marker_size_mm
                 # Check for person in the frame
                 # Get the x, y, w, h from the bounding box
-                height_cm = (person_h_px / ratio_px_mm) / 10
+                height_cm = ((person_h_px / ratio_px_mm) / 10) - 3
+                if recent is not None:
+                    if height_cm > (recent + 5) or height_cm < (recent - 5):
+                        recent = height_cm
+                    else:
+                        height_cm = recent
+                else:
+                    recent = height_cm
                 #  Convert the height (px) to height (cm) using the ratio
                 cv2.putText(img, "Height", (int_corners[taIndex][0][2][0], int_corners[taIndex][0][2][1] - 35),
                             cv2.FONT_HERSHEY_PLAIN, 1, 255, 2)
@@ -224,35 +241,32 @@ def gen_muac_frames():
 
 
 def get_data():
-    while True:
-        success, img = cap.read()  # read the camera frame
-        cv2.flip(img, 1)
-        if not success:
-            break
-        else:
-            # A boolean value for checking whether all essential data is available
-            # Use YOLOV model to detect people
-            markerCorners, ids, _ = detector.detectMarkers(
-                img)  # Aruco detection
-            # Continue if any one Aruco marker is found
-            if ids is not None and len(ids) == 3:
-                int_corners = np.intp(markerCorners)
-                # Draw lines to join Aruco corners
-                caIndex = np.where(ids == [10])[0][0]
-                taIndex = np.where(ids == [1])[0][0]
-                baIndex = np.where(ids == [2])[0][0]
-                # Calculate the marker size in px
-                marker_h_px = (
-                    int_corners[caIndex][0][2][1] - int_corners[caIndex][0][1][1])
-                person_h_px = dist_xy((int_corners[taIndex][0][2][0], int_corners[taIndex][0][2][1]), (
-                    int_corners[baIndex][0][2][0], int_corners[baIndex][0][2][1]))
-
-                # Find the ratio of marker height in px to marker height in mm
-                ratio_px_mm = marker_h_px / marker_size_mm
-                # Check for person in the frame
-                # Get the x, y, w, h from the bounding box
-                height_cm = (person_h_px / ratio_px_mm) / 10
-                #  Convert the height (px) to height (cm) using the ratio
+    height_cm = None
+    muac_cm = None
+    _, img = cap.read()  # read the camera frame
+    cv2.flip(img, 1)
+    # A boolean value for checking whether all essential data is available
+    # Use YOLOV model to detect people
+    markerCorners, ids, _ = detector.detectMarkers(
+        img)  # Aruco detection
+    # Continue if any one Aruco marker is found
+    if ids is not None and len(ids) == 3:
+        int_corners = np.intp(markerCorners)
+        # Draw lines to join Aruco corners
+        caIndex = np.where(ids == [10])[0][0]
+        taIndex = np.where(ids == [1])[0][0]
+        baIndex = np.where(ids == [2])[0][0]
+        # Calculate the marker size in px
+        marker_h_px = (
+            int_corners[caIndex][0][2][1] - int_corners[caIndex][0][1][1])
+        person_h_px = dist_xy((int_corners[taIndex][0][2][0], int_corners[taIndex][0][2][1]), (
+            int_corners[baIndex][0][2][0], int_corners[baIndex][0][2][1]))
+        # Find the ratio of marker height in px to marker height in mm
+        ratio_px_mm = marker_h_px / marker_size_mm
+        # Check for person in the frame
+        # Get the x, y, w, h from the bounding box
+        height_cm = ((person_h_px / ratio_px_mm) / 10) - 3
+        #  Convert the height (px) to height (cm) using the ratio
         # Convert frame to RGB since Mediapipe processes only RGB images
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # Process the RGB frame to get the landmarks
@@ -271,7 +285,6 @@ def get_data():
             # Calculate the midpoint of line
             mid = (round((rePos[0] + rsPos[0]) / 2),
                    round((rePos[1] + rsPos[1]) / 2))
-
             # ---- Find Mid-Upper Arm Diameter ----
             # Calculate the padding to be given to the midpoint
             x_padding = round(dist_xy(rsPos, mid) / 2)
@@ -280,7 +293,6 @@ def get_data():
             muac_cm = 2 * math.pi * \
                 ((mid_upper_arm_diameter / ratio_px_mm) / 2)
             # --------
-
     return {
         "height_cm": height_cm,
         "muac_cm": muac_cm
@@ -313,4 +325,4 @@ def muac():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(port=5000)

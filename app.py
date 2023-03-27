@@ -1,29 +1,26 @@
 import tkinter as tk
+from tkinter import messagebox
 import os
 
 
 def ai():
+    messagebox.showinfo("Info", "You may close the window after use.")
     r.destroy()
-    print("------------------------------------------")
-    print("------ AI Detection Method Running -------")
-    print("--- Please close this window after use ---")
-    print("------------------------------------------")
     os.system(
         "C:/Users/hp/AppData/Local/Programs/Python/Python38/python.exe ai_technique.py")
 
 
 def aruco():
+    messagebox.showinfo("Info", "You may close the window after use.")
     r.destroy()
-    print("------------------------------------------")
-    print("---- Marker Detection Method Running -----")
-    print("--- Please close this window after use ---")
-    print("------------------------------------------")
     os.system(
         "C:/Users/hp/AppData/Local/Programs/Python/Python38/python.exe aruco_technique.py")
 
 
 r = tk.Tk()
+icon = tk.PhotoImage(file="PoshTrack_Logo_Mini.png")
 r.geometry("1000x500")
+r.iconphoto(False, icon)
 r.title('PoshTrack')
 text = tk.Label(r, text="Welcome to PoshTrack Computer Vision",
                 font=("Poppins Medium", 18))
