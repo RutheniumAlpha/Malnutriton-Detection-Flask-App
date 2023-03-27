@@ -9,6 +9,13 @@ app = Flask(__name__)
 CORS(app)
 
 
+def crop(frame):
+    if frame.shape[0] > 480 and frame.shape[1] > 640:
+        return frame[0:480, 0:640]
+    else:
+        return frame
+
+
 def dist_xy(point1, point2):
     """ Euclidean distance between two points point1, point2 """
     diff_point1 = (point1[0] - point2[0]) ** 2
@@ -16,28 +23,31 @@ def dist_xy(point1, point2):
     return (diff_point1 + diff_point2) ** 0.5
 
 
-def find_mid_arm_diameter(frame, mid_point, padding):
-    """ Calculate the mid-upper arm diameter. """
-    mid_arm = frame[mid_point[1] - padding: mid_point[1] +
-                    padding, mid_point[0] - padding: mid_point[0] + padding]
-    if mid_arm.size == 0:
-        return 0
-    mid_arm = cv2.Canny(mid_arm, 100, 250)
-    top_part = mid_arm[0:round(mid_arm.shape[1] // 2), 0:]
-
-    bottom_part = mid_arm[round(mid_arm.shape[1] // 2):, 0:]
-    tpp, bpp = top_part[0:, top_part.shape[0] //
-                        2], bottom_part[0:, bottom_part.shape[0] // 2]
-    tpe, bpe = cv2.findNonZero(tpp), cv2.findNonZero(bpp)
+def find_mid_arm_distance(frame, mid_point, padding):
     try:
-        if (tpe.size == 0 or bpe.size == 0):
+        """ Calculate the mid-upper arm diameter. """
+        mid_arm = frame[mid_point[1] - padding: mid_point[1] +
+                        padding, mid_point[0] - padding: mid_point[0] + padding]
+        if mid_arm.size == 0:
             return 0
+        mid_arm = cv2.Canny(mid_arm, 100, 250)
+        top_part = mid_arm[0:round(mid_arm.shape[1] // 2), 0:]
+
+        bottom_part = mid_arm[round(mid_arm.shape[1] // 2):, 0:]
+        tpp, bpp = top_part[0:, top_part.shape[0] //
+                            2], bottom_part[0:, bottom_part.shape[0] // 2]
+        tpe, bpe = cv2.findNonZero(tpp), cv2.findNonZero(bpp)
+        try:
+            if (tpe.size == 0 or bpe.size == 0):
+                return 0
+        except:
+            return 0
+        top_height = padding - tpe[0][len(tpe[0]) - 1][1]
+        bottom_height = padding - bpe[0][0][1]
+        print(top_height, bottom_height)
+        return top_height + bottom_height
     except:
         return 0
-    top_height = padding - tpe[0][len(tpe[0]) - 1][1]
-    bottom_height = padding - bpe[0][0][1]
-    print(top_height, bottom_height)
-    return top_height + bottom_height
 
 
 # Load YOLOV model
@@ -67,6 +77,7 @@ def gen_calibration_frames():
     recent = None
     while True:
         success, img = cap.read()  # read the camera frame
+        img = crop(img)
         cv2.flip(img, 1)
         if not success:
             break
@@ -119,6 +130,7 @@ def gen_height_frames():
     recent = None
     while True:
         success, img = cap.read()  # read the camera frame
+        img = crop(img)
         cv2.flip(img, 1)
         if not success:
             break
@@ -169,8 +181,10 @@ def gen_height_frames():
 
 
 def gen_muac_frames():
+    recent = None
     while True:
         success, img = cap.read()  # read the camera frame
+        img = crop(img)
         cv2.flip(img, 1)
         if not success:
             break
@@ -215,9 +229,19 @@ def gen_muac_frames():
                     # ---- Find Mid-Upper Arm Diameter ----
                     # Calculate the padding to be given to the midpoint
                     x_padding = round(dist_xy(rsPos, mid) / 2)
-                    mid_upper_arm_diameter = find_mid_arm_diameter(
+                    mid_upper_arm_distance = find_mid_arm_distance(
                         newImg, mid, x_padding)  # Find the mid-upper arm diameter
                     # --------
+
+                    muad_cm = mid_upper_arm_distance / ratio_px_mm
+
+                    if recent is not None:
+                        if muad_cm > (recent + 5) or muad_cm < (recent - 5):
+                            recent = muad_cm
+                        else:
+                            muad_cm = recent
+                    else:
+                        recent = muad_cm
 
                     # Drawing the shoulder, elbow and midpoint positions with the Mid-Arm diameter and shoulder-elbow length
                     cv2.circle(img, rsPos, 5, (0, 255, 0), -1)
@@ -225,10 +249,7 @@ def gen_muac_frames():
                     cv2.line(img, rsPos, rePos, (0, 255, 0), 1)
                     cv2.circle(img, mid,
                                5, (0, 255, 0), -1)
-                    cv2.putText(img, f"Length: {round(dist_xy(rePos, rsPos)) // ratio_px_mm} cm",
-                                (mid[0] + 10, mid[1] - 30),
-                                cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1)
-                    cv2.putText(img, f"Mid-Upper Arm Diameter: {mid_upper_arm_diameter//ratio_px_mm} cm",
+                    cv2.putText(img, f"MUAC: {round(2 * math.pi * ((muad_cm) / 2) / 10, 1)} cm",
                                 (mid[0] + 10, mid[1] - 10),
                                 cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 0, 0), 1)
             _, buffer = cv2.imencode('.jpg', img)
@@ -242,6 +263,7 @@ def get_data():
     height_cm = None
     muac_cm = None
     _, img = cap.read()  # read the camera frame
+    img = crop(img)
     cv2.flip(img, 1)
     newImg = img.copy()
     # A boolean value for checking whether all essential data is available
@@ -279,10 +301,10 @@ def get_data():
             # ---- Find Mid-Upper Arm Diameter ----
             # Calculate the padding to be given to the midpoint
             x_padding = round(dist_xy(rsPos, mid) / 2)
-            mid_upper_arm_diameter = find_mid_arm_diameter(
+            mid_upper_arm_distance = find_mid_arm_distance(
                 newImg, mid, x_padding)  # Find the mid-upper arm diameter
-            muac_cm = 2 * math.pi * \
-                ((mid_upper_arm_diameter / ratio_px_mm) / 2)
+            muac_cm = round(
+                2 * math.pi * ((mid_upper_arm_distance/ratio_px_mm) / 2) / 10, 1)
             # --------
 
         # Check for person in the frame

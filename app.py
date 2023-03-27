@@ -18,7 +18,7 @@ def aruco():
 
 
 r = tk.Tk()
-icon = tk.PhotoImage(file="PoshTrack_Logo_Mini.png")
+icon = tk.PhotoImage(file="assets/PoshTrack_Logo_Mini.png")
 r.geometry("1000x500")
 r.iconphoto(False, icon)
 r.title('PoshTrack')
@@ -30,7 +30,7 @@ b1 = tk.Button(r, text="AI Detection Method",
                font=("Poppins Medium", 12), width=40, command=ai)
 b2 = tk.Button(r, text="Marker Detection Method",
                font=("Poppins Medium", 12), width=40, command=aruco)
-img = tk.PhotoImage(file='logo.png')
+img = tk.PhotoImage(file='assets/logo.png')
 tk.Label(r, text="  ").pack()
 tk.Label(r, image=img).pack()
 tk.Label(r, text="  ").pack()
